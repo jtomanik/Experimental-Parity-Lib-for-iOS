@@ -17,6 +17,8 @@
 //! Note that all the structs and functions here are documented in `parity.h`, to avoid
 //! duplicating documentation.
 
+//extern crate libc;
+
 extern crate parity_ethereum;
 extern crate panic_hook;
 
@@ -25,6 +27,7 @@ use std::panic;
 use std::ptr;
 use std::slice;
 use std::str;
+use std::ffi::CStr;
 
 #[repr(C)]
 pub struct ParityParams {
@@ -77,6 +80,62 @@ pub unsafe extern fn parity_config_destroy(cfg: *mut c_void) {
 	let _ = panic::catch_unwind(|| {
 		let _cfg = Box::from_raw(cfg as *mut parity_ethereum::Configuration);
 	});
+}
+
+#[no_mangle]
+pub unsafe extern fn parity_start_default(output: *mut *mut c_void, args: *const c_char) -> c_int {
+	panic::catch_unwind(|| {
+		*output = ptr::null_mut();
+		let argument_string = CStr::from_ptr(args).to_string_lossy().into_owned();
+		let arguments: Vec<&str> = argument_string.split(' ').collect();
+
+		println!("Arguments received: {}", argument_string);
+
+		let config = {
+			parity_ethereum::Configuration::parse_cli(&arguments).unwrap_or_else(|e| e.exit())
+		};
+//		print_config(config);
+
+		let directories = config.directories();
+
+		println!("IPC config state: {}", config.args.flag_no_ipc);
+		println!("Base path args:{:?}, dirs:{}", config.args.arg_base_path, directories.base);
+		println!("DB path args:{:?}, dirs:{} ", config.args.arg_db_path, directories.db);
+		println!("Cache dir:{} ", directories.cache);
+		println!("Keys dir:{} ", directories.keys);
+		println!("Secretstore dir:{} ", directories.secretstore);
+		println!("No warp state: {}", config.args.flag_no_warp);
+		println!("Light client state: {}", config.args.flag_light);
+		println!("Secretstore state: {}", config.args.flag_no_secretstore);
+		println!("Whisper state: {}", config.args.flag_whisper);
+
+		let on_client_restart_cb = |_ : String| {};
+		let action = match parity_ethereum::start(config, on_client_restart_cb, || {}) {
+			Ok(action) => action,
+			Err(msg) => {
+				println!("{}", msg);
+				return 1
+			}
+		};
+
+		match action {
+			parity_ethereum::ExecutionAction::Instant(Some(s)) => { println!("{}", s); 0 },
+			parity_ethereum::ExecutionAction::Instant(None) => 0,
+			parity_ethereum::ExecutionAction::Running(client) => {
+				println!("address of the running client {:p}", &client);
+				let pointer = Box::into_raw(Box::<parity_ethereum::RunningClient>::new(client)) as *mut c_void;
+				println!("address of the boxed client {:p}", pointer);
+				println!("address of the box {:p}", &pointer);
+				*output = pointer;
+				0
+			}
+		}
+	}).unwrap_or(1)
+}
+
+fn print_config(config: parity_ethereum::Configuration) {
+
+//	println!("Light client state: {}", config.args.flag_light);
 }
 
 #[no_mangle]

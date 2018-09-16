@@ -7,7 +7,13 @@ authors = ["Parity Technologies <admin@parity.io>"]
 
 [lib]
 name = "parity"
-crate-type = ["cdylib", "staticlib"]
+path = "src/lib.rs"
+crate-type = ["staticlib"]
+
+[[bin]]
+name = "libexample"
+path = "src/main.rs"
+doc = false
 
 [dependencies]
 panic_hook = { path = "../util/panic_hook" }

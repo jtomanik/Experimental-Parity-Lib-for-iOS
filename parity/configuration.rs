@@ -928,7 +928,7 @@ impl Configuration {
 		})
 	}
 
-	fn directories(&self) -> Directories {
+	pub fn directories(&self) -> Directories {
 		let local_path = default_local_path();
 		let base_path = self.args.arg_base_path.as_ref().or_else(|| self.args.arg_datadir.as_ref()).map_or_else(|| default_data_path(), |s| s.clone());
 		let data_path = replace_home("", &base_path);

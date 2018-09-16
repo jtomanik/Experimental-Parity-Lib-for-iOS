@@ -20,7 +20,7 @@
 #include <stddef.h>
 
 /// Parameters to pass to `parity_start`.
-struct ParityParams {
+typedef struct ParityParams {
 	/// Configuration object, as handled by the `parity_config_*` functions.
 	/// Note that calling `parity_start` will destroy the configuration object (even on failure).
 	void *configuration;
@@ -35,7 +35,7 @@ struct ParityParams {
 
 	/// Custom parameter passed to the `on_client_restart_cb` callback as first parameter.
 	void *on_client_restart_cb_custom;
-};
+} ParityParams;
 
 #ifdef __cplusplus
 extern "C" {
@@ -68,6 +68,8 @@ int parity_config_from_cli(char const* const* args, size_t const* arg_lens, size
 /// **Important**: You probably don't need to call this function. Calling `parity_start` destroys
 /// 				the configuration object as well (even on failure).
 void parity_config_destroy(void* cfg);
+
+int parity_start_default(void** out, const char *args);
 
 /// Starts the parity client in background threads. Returns a pointer to a struct that represents
 /// the running client. Can also return NULL if the execution completes instantly.
