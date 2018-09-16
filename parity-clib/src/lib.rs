@@ -90,6 +90,7 @@ pub unsafe extern fn parity_start_default(output: *mut *mut c_void, args: *const
 		let arguments: Vec<&str> = argument_string.split(' ').collect();
 
 		println!("Arguments received: {}", argument_string);
+		println!("Arguments parsed: {}", arguments);
 
 		let config = {
 			parity_ethereum::Configuration::parse_cli(&arguments).unwrap_or_else(|e| e.exit())
@@ -131,11 +132,6 @@ pub unsafe extern fn parity_start_default(output: *mut *mut c_void, args: *const
 			}
 		}
 	}).unwrap_or(1)
-}
-
-fn print_config(config: parity_ethereum::Configuration) {
-
-//	println!("Light client state: {}", config.args.flag_light);
 }
 
 #[no_mangle]
