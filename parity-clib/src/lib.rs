@@ -27,6 +27,7 @@ use std::panic;
 use std::ptr;
 use std::slice;
 use std::str;
+use std::ffi::CStr;
 
 #[cfg(feature = "jni")]
 use std::mem;
@@ -41,14 +42,14 @@ pub struct ParityParams {
 }
 
 #[no_mangle]
-pub unsafe extern fn parity_start_default(output: *mut *mut c_void, args: *const c_char) -> c_int {
+pub unsafe extern fn parity_start_ios(output: *mut *mut c_void, args: *const c_char) -> c_int {
 	panic::catch_unwind(|| {
 		*output = ptr::null_mut();
 		let argument_string = CStr::from_ptr(args).to_string_lossy().into_owned();
 		let arguments: Vec<&str> = argument_string.split(' ').collect();
 
 		println!("Arguments received: {}", argument_string);
-		println!("Arguments parsed: {}", arguments);
+		println!("Arguments parsed: {:?}", arguments);
 
 		let config = {
 			parity_ethereum::Configuration::parse_cli(&arguments).unwrap_or_else(|e| e.exit())
@@ -89,6 +90,15 @@ pub unsafe extern fn parity_start_default(output: *mut *mut c_void, args: *const
 			}
 		}
 	}).unwrap_or(1)
+}
+
+#[no_mangle]
+pub unsafe extern fn parity_rpc_ios(bytes: *const u8, len: usize) {
+	let byte_slice = slice::from_raw_parts(bytes, len as usize);
+	match str::from_utf8(byte_slice) {
+		Ok(s)    => println!("got {}", s),
+		Err(err) => println!("invalid UTF-8 data: {}", err),
+	}
 }
 
 #[no_mangle]
