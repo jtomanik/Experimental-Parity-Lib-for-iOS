@@ -81,6 +81,7 @@ pub unsafe extern fn parity_start_ios(output: *mut *mut c_void, args: *const c_c
 			parity_ethereum::ExecutionAction::Instant(Some(s)) => { println!("{}", s); 0 },
 			parity_ethereum::ExecutionAction::Instant(None) => 0,
 			parity_ethereum::ExecutionAction::Running(client) => {
+//				client.debug_print_type();
 				println!("address of the running client {:p}", &client);
 				let pointer = Box::into_raw(Box::<parity_ethereum::RunningClient>::new(client)) as *mut c_void;
 				println!("address of the boxed client {:p}", pointer);
@@ -93,12 +94,34 @@ pub unsafe extern fn parity_start_ios(output: *mut *mut c_void, args: *const c_c
 }
 
 #[no_mangle]
-pub unsafe extern fn parity_rpc_ios(bytes: *const u8, len: usize) {
-	let byte_slice = slice::from_raw_parts(bytes, len as usize);
-	match str::from_utf8(byte_slice) {
-		Ok(s)    => println!("got {}", s),
-		Err(err) => println!("invalid UTF-8 data: {}", err),
-	}
+pub unsafe extern fn parity_rpc_ios(client: *mut c_void, query: *const c_char)  -> c_int {
+	panic::catch_unwind(|| {
+//		let client: &mut parity_ethereum::RunningClient = &mut *(client as *mut parity_ethereum::RunningClient);
+		println!("address of the from pointer {:p}", client);
+		println!("address of the pointer {:p}", &client);
+		let local_client = Box::from_raw(client as *mut parity_ethereum::RunningClient);
+		println!("address of the boxed client {:p}", local_client);
+		println!("address of the box {:p}", &local_client);
+//		local_client.debug_print_type();
+
+		let query_string = CStr::from_ptr(query).to_string_lossy().into_owned();
+		println!("query received: {}", query_string);
+
+		if let Some(output) = local_client.rpc_query_sync(&query_string) {
+			println!("result: {}", output);
+
+//			let q_out_len = output.as_bytes().len();
+//			if *out_len < q_out_len {
+//				return 1;
+//			}
+//
+//			ptr::copy_nonoverlapping(output.as_bytes().as_ptr(), out_str as *mut u8, q_out_len);
+//			*out_len = q_out_len;
+			0
+		} else {
+			1
+		}
+	}).unwrap_or(1)
 }
 
 #[no_mangle]
