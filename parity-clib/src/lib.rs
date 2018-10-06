@@ -28,6 +28,7 @@ use std::ptr;
 use std::slice;
 use std::str;
 use std::ffi::CStr;
+use std::ffi::CString;
 
 #[cfg(feature = "jni")]
 use std::mem;
@@ -48,8 +49,8 @@ pub unsafe extern fn parity_start_ios(output: *mut *mut c_void, args: *const c_c
 		let argument_string = CStr::from_ptr(args).to_string_lossy().into_owned();
 		let arguments: Vec<&str> = argument_string.split(' ').collect();
 
-		println!("Arguments received: {}", argument_string);
-		println!("Arguments parsed: {:?}", arguments);
+//		println!("Arguments received: {}", argument_string);
+//		println!("Arguments parsed: {:?}", arguments);
 
 		let config = {
 			parity_ethereum::Configuration::parse_cli(&arguments).unwrap_or_else(|e| e.exit())
@@ -57,16 +58,16 @@ pub unsafe extern fn parity_start_ios(output: *mut *mut c_void, args: *const c_c
 
 		let directories = config.directories();
 
-		println!("IPC config state: {}", config.args.flag_no_ipc);
-		println!("Base path args:{:?}, dirs:{}", config.args.arg_base_path, directories.base);
-		println!("DB path args:{:?}, dirs:{} ", config.args.arg_db_path, directories.db);
-		println!("Cache dir:{} ", directories.cache);
-		println!("Keys dir:{} ", directories.keys);
-		println!("Secretstore dir:{} ", directories.secretstore);
-		println!("No warp state: {}", config.args.flag_no_warp);
-		println!("Light client state: {}", config.args.flag_light);
-		println!("Secretstore state: {}", config.args.flag_no_secretstore);
-		println!("Whisper state: {}", config.args.flag_whisper);
+//		println!("IPC config state: {}", config.args.flag_no_ipc);
+//		println!("Base path args:{:?}, dirs:{}", config.args.arg_base_path, directories.base);
+//		println!("DB path args:{:?}, dirs:{} ", config.args.arg_db_path, directories.db);
+//		println!("Cache dir:{} ", directories.cache);
+//		println!("Keys dir:{} ", directories.keys);
+//		println!("Secretstore dir:{} ", directories.secretstore);
+//		println!("No warp state: {}", config.args.flag_no_warp);
+//		println!("Light client state: {}", config.args.flag_light);
+//		println!("Secretstore state: {}", config.args.flag_no_secretstore);
+//		println!("Whisper state: {}", config.args.flag_whisper);
 
 		let on_client_restart_cb = |_ : String| {};
 		let action = match parity_ethereum::start(config, on_client_restart_cb, || {}) {
@@ -81,11 +82,7 @@ pub unsafe extern fn parity_start_ios(output: *mut *mut c_void, args: *const c_c
 			parity_ethereum::ExecutionAction::Instant(Some(s)) => { println!("{}", s); 0 },
 			parity_ethereum::ExecutionAction::Instant(None) => 0,
 			parity_ethereum::ExecutionAction::Running(client) => {
-//				client.debug_print_type();
-				println!("address of the running client {:p}", &client);
 				let pointer = Box::into_raw(Box::<parity_ethereum::RunningClient>::new(client)) as *mut c_void;
-				println!("address of the boxed client {:p}", pointer);
-				println!("address of the box {:p}", &pointer);
 				*output = pointer;
 				0
 			}
@@ -94,34 +91,31 @@ pub unsafe extern fn parity_start_ios(output: *mut *mut c_void, args: *const c_c
 }
 
 #[no_mangle]
-pub unsafe extern fn parity_rpc_ios(client: *mut c_void, query: *const c_char)  -> c_int {
+pub unsafe extern fn parity_rpc_ios_query(client: *mut c_void, query: *const c_char, reply: *mut *mut c_char)  -> c_int {
 	panic::catch_unwind(|| {
-//		let client: &mut parity_ethereum::RunningClient = &mut *(client as *mut parity_ethereum::RunningClient);
-		println!("address of the from pointer {:p}", client);
-		println!("address of the pointer {:p}", &client);
-		let local_client = Box::from_raw(client as *mut parity_ethereum::RunningClient);
-		println!("address of the boxed client {:p}", local_client);
-		println!("address of the box {:p}", &local_client);
-//		local_client.debug_print_type();
 
-		let query_string = CStr::from_ptr(query).to_string_lossy().into_owned();
-		println!("query received: {}", query_string);
+		if client.is_null() || query.is_null() {
+			return 2;
+		}
 
-		if let Some(output) = local_client.rpc_query_sync(&query_string) {
-			println!("result: {}", output);
+		let local_client: &mut parity_ethereum::RunningClient = &mut *(client as *mut parity_ethereum::RunningClient);
+		let query = CStr::from_ptr(query).to_string_lossy().into_owned();
 
-//			let q_out_len = output.as_bytes().len();
-//			if *out_len < q_out_len {
-//				return 1;
-//			}
-//
-//			ptr::copy_nonoverlapping(output.as_bytes().as_ptr(), out_str as *mut u8, q_out_len);
-//			*out_len = q_out_len;
+		if let Some(output) = local_client.rpc_query_sync(&query) {
+			let c_output = CString::new(output).unwrap();
+			let output_pointer = c_output.into_raw();
+			*reply = output_pointer;
 			0
 		} else {
 			1
 		}
 	}).unwrap_or(1)
+}
+
+#[no_mangle]
+pub unsafe extern fn parity_rpc_ios_release(reply: *mut c_char) {
+	if reply.is_null() { return }
+	CString::from_raw(reply);
 }
 
 #[no_mangle]
