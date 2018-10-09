@@ -16,7 +16,9 @@ static A: System = System;
 fn main() {
 
 	let mut client = ptr::null_mut();
-	let args = CString::new("parity --light --no-ipc").unwrap();
+	let chainspec_path = "/Users/jakubtomanik/github/parity/parity-clib/custom_foundation.json";
+	let args_string = format!("parity --light --no-ipc --no-color --chain={}", chainspec_path);
+	let args = CString::new(args_string).unwrap();
 
 	let mut srcunit = String::new();
 	let mut switch = true;
