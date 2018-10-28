@@ -17,10 +17,15 @@
 //! Note that all the structs and functions here are documented in `parity.h`, to avoid
 //! duplicating documentation.
 
+//#![feature(alloc_jemalloc)]
+//#![crate_type = "staticlib"]
+
 #[cfg(feature = "jni")]
 extern crate jni;
 extern crate parity_ethereum;
 extern crate panic_hook;
+
+//extern crate alloc_jemalloc;
 
 use std::os::raw::{c_char, c_void, c_int};
 use std::panic;
