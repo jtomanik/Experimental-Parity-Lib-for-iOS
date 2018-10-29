@@ -104,7 +104,7 @@ pub unsafe extern fn parity_start_ios(output: *mut *mut c_void, args: *const c_c
 }
 
 #[no_mangle]
-pub unsafe extern fn parity_rpc_ios_query(client: *mut c_void, query: *const c_char, reply: *mut *mut c_char)  -> c_int {
+pub unsafe extern fn parity_rpc_ios_query(client: *mut c_void, query: *const c_char, reply_bytes: *mut *mut c_char, reply_length: *mut usize)  -> c_int {
 	panic::catch_unwind(|| {
 
 		if client.is_null() || query.is_null() {
@@ -115,9 +115,12 @@ pub unsafe extern fn parity_rpc_ios_query(client: *mut c_void, query: *const c_c
 		let query = CStr::from_ptr(query).to_string_lossy().into_owned();
 
 		if let Some(output) = local_client.rpc_query_sync(&query) {
-			let c_output = CString::new(output).unwrap();
+			let output_bytes = output.as_bytes();
+			let output_length = output_bytes.len();
+			let c_output = CString::new(output_bytes).unwrap();
 			let output_pointer = c_output.into_raw();
-			*reply = output_pointer;
+			*reply_bytes = output_pointer as *mut c_char;
+			*reply_length = output_length;
 			0
 		} else {
 			1
