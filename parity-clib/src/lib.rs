@@ -25,7 +25,8 @@ extern crate jni;
 extern crate parity_ethereum;
 extern crate panic_hook;
 
-//extern crate alloc_jemalloc;
+#[cfg(feature = "jemalloc")]
+extern crate alloc_jemalloc;
 
 use std::os::raw::{c_char, c_void, c_int};
 use std::panic;
@@ -39,6 +40,13 @@ use std::ffi::CString;
 use std::mem;
 #[cfg(feature = "jni")]
 use jni::{JNIEnv, objects::JClass, objects::JString, sys::jlong, sys::jobjectArray};
+
+#[cfg(feature = "malloc")]
+use std::alloc::System;
+
+#[cfg(feature = "malloc")]
+#[global_allocator]
+static A: System = System;
 
 #[repr(C)]
 pub struct ParityParams {
