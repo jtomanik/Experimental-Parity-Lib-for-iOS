@@ -300,60 +300,21 @@ Please copy that file into the `\lib` directory in the folder where you have che
 
 ### Running the ParityStaticLibTest 
 
-
-
 # Future work
 
 This section contains random brain dumps
 
 ## Potential improvements
 
-### Providing custom chainspec with 
+# Performance benchmarking
 
-`parity --light export-hardcoded-sync > hardcodedSync.txt`
+### RocksDB tuning
 
-## Create 64bit library
-Due to different page sizes on 64 bit and 32 bit iPhones and jemalloc configuration when compiling library with jemalloc support we can only target 64 bit platforms.
+### Jemalloc
 
-Before proceeding make sure that yopu are using `nightly` environment.
+### RocksDB Lite
 
-In order to create universal 64 bit library you need to run following commands from `parity-clib` directory:
-
-`cargo build --lib --target x86_64-apple-ios`
-
-`cargo build --lib --target aarch64-apple-ios`
-
-`lipo -create ../target/aarch64-apple-ios/debug/libparity.a ../target/x86_64-apple-ios/debug/libparity.a -output ../target/debug/libparity.a`
-
-If you need to replace one of the libraries that make universal library you can modify this command:
-
-`lipo -replace arm64  aarch64-apple-ios/release/libparity.a universal/release/libparity.a -output universal/release/libparity2.a`
- 
-
-# Different memmory allocators for libparity
-
-## 1. system's Malloc
-
-1. Make sure that `heapsize` is patched.
-2. Make sure `rust-crypto` is patched
-2. create universal library with following command: `cargo lipo --features malloc --release
-`
-
-## 2. Rust's jemalloc
-
-1. Make sure that `heapsize` is **not** patched.  
-2. Uncomment following lines from `parity-clib/src.lib.rs` 
-```
-#![feature(alloc_jemalloc)]
-#![crate_type = "staticlib"]
-```
-3. create universal library with following command: `cargo lipo --features jemalloc --release`
-
-## 3. external jemalloc
-
-# Building parity app 
-
-`cargo build --features memory_profiling`
+### Custom chainspec 
 
 # Good to know stuff
 For people not familiar with the Rust
@@ -381,65 +342,4 @@ Downloaded crates:
 Note: When you discard downloaded crates, you will have to apply patches again.
 
 
-# Misc stuff from bash history
 
-`cargo install cbindgen`
-
-`cbindgen -o test.h`
-
-`parity --light --no-ipc --no-color --no-ws --no-jsonrpc --base-path=$documentsDirectory --chain=$chainspecPath`
-
-`curl --data '{"method":"eth_syncing","params":[],"id":1,"jsonrpc":"2.0"}' -H "Content-Type: application/json" -X POST localhost:8545`
-
-`enode://2b59afa133c69e1fb93e4a88efe56357e1cc073f971951a6576a8d50df0f38a79d244346c49f09d32cbc70d40107c7ba93a6460a70d9b189cd6d0ae88efac072@35.242.227.201:30303`
-
-`#crate-type = ["staticlib"]`
-
-`memory_profiling`
-
-`nm libparity.a | grep " U " | grep usable`
-
-`cargo build --features memory_profiling`
-
-`./target/debug/parity --light db kill`
-
-`parity --light --no-ipc --no-color --no-ws --chain=/Users/jakubtomanik/github/parity/parity-clib/custom_foundation.json`
-
-`https://gist.github.com/Wizermil/1b8144e4f67511c1f7d6`
-
-
-in rocksdb_options.rs
-```
-    #[cfg(not(any(target_os = "ios", target_os = "android")))]
-    pub fn increase_parallelism(&mut self, parallelism: i32) {
-        unsafe {
-            rocksdb_ffi::rocksdb_options_increase_parallelism(self.inner,
-                                                              parallelism);
-        }
-    }
-    
-    #[cfg(not(any(target_os = "ios", target_os = "android")))]
-    pub fn set_block_cache_size_mb(&mut self, cache_size: u64) {
-        unsafe {
-            rocksdb_ffi::rocksdb_options_optimize_for_point_lookup(self.inner,
-                                                                   cache_size);
-        }
-    }
-    
-    #[cfg(not(any(target_os = "ios", target_os = "android")))]
-    pub fn optimize_level_style_compaction(&mut self,
-                                           memtable_memory_budget: i32) {
-        unsafe {
-            rocksdb_ffi::rocksdb_options_optimize_level_style_compaction(
-                self.inner, memtable_memory_budget);
-        }
-    }
-```
-
-in kvdb-rocksdb-0.1.4/src/lib.rs
-```
-		#[cfg(not(any(target_os = "ios", target_os = "android")))]
-		opts.increase_parallelism(cmp::max(1, ::num_cpus::get() as i32 / 2));
-```
-
-in 
