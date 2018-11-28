@@ -118,6 +118,8 @@ name = "parity"
 [profile.dev]
 
 [profile.release]
+# enable debug symbols for release builds
+#debug = true
 debug = false
 
 [workspace]
