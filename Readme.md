@@ -1,11 +1,12 @@
 # Experimental Parity Light Client for iOS 
 
 This is repo contains experimental work that aims at creating a build of Parity Library that works on iOS devices. This project is still at an early stage. 
+This is a "living document" and I will be updating it as my work will be progressing.
 
 ## iOS library
 
 This guide assumes that you already have an Xcode 10.1 installed and configured for development. 
-Moreover, you need an iPhone device and a lightning cable in order to run builds on the device.  
+Moreover, you need an iPhone device with the latest iOS (12.1) and a lightning cable in order to run builds on the device.  
 
 ## Get sources
 
@@ -294,16 +295,71 @@ Now go for a walk or just make yourself a coffee and fetch your favorite book. T
 ### Copying the library
 If everything went well you should be able to find `libparity.a` in the following directory (relative to the root folder of the repo):
 
-`target\`
+`target\universal/release`
 
 Please copy that file into the `\lib` directory in the folder where you have checked out ParityStaticLibTest repo.
 
 ### Running the ParityStaticLibTest 
 
-Xcode console log:
+Once you have `libparity.a` copied. Make sure you have your iPhone connected with the cable an open `StaticLibTest.xcodeproj` with Xcode.
+You should be able to see the following screen: 
+
+![xcode](xcode_screen_1.png)
+
+Now you need:
+1. Change Team from `None` to your Personal Team
+2. From the drop-down menu choose your iPhone
+3. Press `Run` to start the build
+
+(If you are not familiar with Xcode I've annotated the screenshot for you) 
+
+Note: Before the first run you will get an error:
 ```
+Could not launch “StaticLibTest”
+```
+Follow the instructions in the error message and run the project again.
+
+
+Once you will have the app running you will be able to see log from running parity in the Debug Area (console log):
+```
+Docs directory /var/mobile/Containers/Data/Application/1ED484EE-5A0B-493A-898C-0D805BC61073/Documents
+Chain spec directory /var/containers/Bundle/Application/7B84EECE-6539-4555-AAD6-56226B9AA441/StaticLibTest.app/custom_foundation.json
+2018-11-28 22:15:16  Starting Parity-Ethereum/v2.2.0-unstable-49d1fd107-20181029/aarch64-ios/rustc1.30.0
+2018-11-28 22:15:16  Keys path /var/mobile/Containers/Data/Application/1ED484EE-5A0B-493A-898C-0D805BC61073/Documents/keys/ethereum
+2018-11-28 22:15:16  DB path /var/mobile/Containers/Data/Application/1ED484EE-5A0B-493A-898C-0D805BC61073/Documents/chains_light/ethereum/db/906a34e69aec8c0d
+2018-11-28 22:15:16  Running in experimental Light Client mode.
+2018-11-28 22:15:17  Inserting hardcoded block #6602753 in chain
+2018-11-28 22:15:17  Debug API is not available in light client mode.
+Starting ``RPC test...
+{"jsonrpc":"2.0","result":"0x0","id":1}
+2018-11-28 22:15:17  Public node URL: enode://69ac902f8b195b87656c3b3f627990d572c5647ce4f4a19fe221f0e1c9241a0016e12278efef3d70ddb1b1f4a73ff377dcb6f121bf6e36bb72cabc21f413b508@10.125.239.37:30303
+2018-11-28 22:15:47     1/50 peers   568 bytes cache  0 bytes queue  RPC:  0 conn,    0 req/s, 1715 µs
+2018-11-28 22:16:07  Syncing #6602753 0x9f02…1e30     0.0 hdr/s   5630+    0 Qed   2/50 peers   568 bytes cache    4 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
+size check8388608block_bytes check8388608
+2018-11-28 22:16:12  Syncing #6603820 0x74fe…12a6   213.3 hdr/s  25811+    0 Qed   3/50 peers    589 KiB cache   19 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
+2018-11-28 22:16:17  Syncing #6604910 0x1826…8cce   217.8 hdr/s  30097+    0 Qed   3/50 peers      1 MiB cache   22 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
+2018-11-28 22:16:22  Syncing #6606436 0xf60f…de0d   305.0 hdr/s  28699+    0 Qed   3/50 peers      2 MiB cache   21 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
+2018-11-28 22:16:27  Syncing #6607976 0xbbb1…ccfe   307.9 hdr/s  28567+    0 Qed   4/50 peers      3 MiB cache   21 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
+2018-11-28 22:16:32  Syncing #6609495 0x234a…ddb1   303.5 hdr/s  28584+    0 Qed   2/50 peers      4 MiB cache   21 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
+2018-11-28 22:16:37  Syncing #6611024 0x5b3c…4c40   305.5 hdr/s  28591+    0 Qed   3/50 peers      4 MiB cache   21 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
+2018-11-28 22:16:42  Syncing #6612508 0x5f32…70dd   296.5 hdr/s  28643+    0 Qed   3/50 peers      5 MiB cache   21 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
+size check8388608block_bytes check8388608
+2018-11-28 22:16:47  Syncing #6614056 0x9a91…e5ac   309.5 hdr/s  28503+    0 Qed   6/50 peers      6 MiB cache   21 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
+2018-11-28 22:16:52  Syncing #6615584 0x6c89…c653   305.5 hdr/s  29535+    0 Qed   7/50 peers      7 MiB cache   22 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
+2018-11-28 22:16:57  Syncing #6617122 0x2697…03a3   307.4 hdr/s  28509+    0 Qed   7/50 peers      8 MiB cache   21 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
+2018-11-28 22:17:02  Syncing #6618645 0xc022…739d   304.4 hdr/s  28522+    0 Qed   4/50 peers      9 MiB cache   21 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
+2018-11-28 22:17:07  Syncing #6620194 0xda64…70bc   309.5 hdr/s  29789+    0 Qed   5/50 peers      9 MiB cache   22 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
+2018-11-28 22:17:12  Syncing #6621702 0xee06…acdd   301.4 hdr/s  29177+    0 Qed   6/50 peers     10 MiB cache   21 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
+size check8388608block_bytes check8388608
+2018-11-28 22:17:17  Syncing #6623224 0x2a54…c1bf   304.3 hdr/s  29703+    0 Qed   6/50 peers     10 MiB cache   22 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
+2018-11-28 22:17:22  Syncing #6624743 0x9b3b…e752   303.7 hdr/s  28568+    0 Qed   4/50 peers     10 MiB cache   21 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
+2018-11-28 22:17:27  Syncing #6626281 0x9226…143e   307.6 hdr/s  28566+    1 Qed   7/50 peers     10 MiB cache   21 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
+2018-11-28 22:17:32  Syncing #6627790 0xa867…3984   301.5 hdr/s  28593+    0 Qed   5/50 peers     10 MiB cache   21 MiB queue  RPC:  0 conn,    0 req/s, 1715 µs
 
 ```
+(Results from iPhone 6S Plus)
+
+Note: If you can't see Debug Area click `View->Debug Area-> Show Debug Area`
 
 # Future work
 
@@ -352,6 +408,3 @@ Downloaded crates:
 `rm -rf ~/.cargo/registry/src`
 
 Note: When you discard downloaded crates, you will have to apply patches again.
-
-
-
