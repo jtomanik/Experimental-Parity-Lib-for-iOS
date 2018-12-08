@@ -7,22 +7,14 @@ authors = ["Parity Technologies <admin@parity.io>"]
 
 [lib]
 name = "parity"
-path = "src/lib.rs"
-crate-type = ["staticlib"]
-
-[[bin]]
-name = "libexample"
-path = "src/main.rs"
-doc = false
+crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 panic_hook = { path = "../util/panic_hook" }
 parity-ethereum = { path = "../", default-features = false }
 ethcore-logger = { path = "../logger" }
-#jemallocator = { path = "jemallocator", default-features = false }
+jni = { version = "0.10.1", optional = true }
 
 [features]
 default = []
 final = ["parity-ethereum/final"]
-malloc = []
-jemalloc = []
