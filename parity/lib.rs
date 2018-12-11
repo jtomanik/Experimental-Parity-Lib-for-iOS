@@ -184,6 +184,7 @@ fn execute<Cr, Rr>(command: Execute, on_client_rq: Cr, on_updater_rq: Rr) -> Res
 {
 	// TODO: move this to `main()` and expose in the C API so that users can setup logging the way
 	// 		they want
+	#[cfg(not(feature = "clib"))]
 	let logger = setup_log(&command.logger).expect("Logger is initialized only once; qed");
 
 	#[cfg(feature = "deadlock_detection")]
