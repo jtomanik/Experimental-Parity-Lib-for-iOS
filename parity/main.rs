@@ -26,6 +26,7 @@ extern crate log;
 extern crate panic_hook;
 extern crate parity_ethereum;
 extern crate parking_lot;
+extern crate ethcore_logger;
 
 #[cfg(windows)] extern crate winapi;
 
@@ -40,6 +41,7 @@ use std::{process, env};
 use ctrlc::CtrlC;
 use dir::default_hypervisor_path;
 use fdlimit::raise_fd_limit;
+use ethcore_logger::{setup_log, RotatingLogger};
 use parity_ethereum::{start, ExecutionAction};
 use parking_lot::{Condvar, Mutex};
 
@@ -205,9 +207,13 @@ fn main_direct(force_can_restart: bool) -> i32 {
 	// again.
 	let exiting = Arc::new(AtomicBool::new(false));
 
+	let logger_config = conf.logger_config();
+	let logger = setup_log(&logger_config).expect("Logger is initialized only once; qed");
+
 	let exec = if can_restart {
 		start(
 			conf,
+			logger,
 			{
 				let e = exit.clone();
 				let exiting = exiting.clone();
@@ -242,7 +248,7 @@ fn main_direct(force_can_restart: bool) -> i32 {
 
 	} else {
 		trace!(target: "mode", "Not hypervised: not setting exit handlers.");
-		start(conf, move |_| {}, move || {})
+		start(conf, logger,move |_| {}, move || {})
 	};
 
 	let res = match exec {

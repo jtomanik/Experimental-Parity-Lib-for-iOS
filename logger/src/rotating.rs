@@ -46,6 +46,7 @@ pub fn init_log() {
 const LOG_SIZE : usize = 128;
 
 /// Logger implementation that keeps up to `LOG_SIZE` log elements.
+#[derive(Debug)]
 pub struct RotatingLogger {
 	/// Defined logger levels
 	levels: String,
@@ -83,6 +84,13 @@ impl RotatingLogger {
 		self.logs.read()
 	}
 
+}
+
+impl PartialEq for RotatingLogger {
+	fn eq(&self, other: &RotatingLogger) -> bool {
+		(self.levels == other.levels) &&
+		(self.logs().eq(other.logs().as_ref()))
+	}
 }
 
 #[cfg(test)]

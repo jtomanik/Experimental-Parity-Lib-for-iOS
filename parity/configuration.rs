@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Parity.  If not, see <http://www.gnu.org/licenses/>.
 
+extern crate ethcore_logger;
+
 use std::time::Duration;
 use std::io::Read;
 use std::net::SocketAddr;
@@ -54,13 +56,18 @@ use presale::ImportWallet;
 use account::{AccountCmd, NewAccount, ListAccounts, ImportAccounts, ImportFromGethAccounts};
 use snapshot::{self, SnapshotCommand};
 use network::{IpFilter};
+use ethcore_logger::RotatingLogger;
+use std::sync::Arc;
 
 const DEFAULT_MAX_PEERS: u16 = 50;
 const DEFAULT_MIN_PEERS: u16 = 25;
 
 #[derive(Debug, PartialEq)]
 pub enum Cmd {
-	Run(RunCmd),
+	Run {
+		cmd: RunCmd,
+		logger: Arc<RotatingLogger>
+	},
 	Version,
 	Account(AccountCmd),
 	ImportPresaleWallet(ImportWallet),
@@ -86,11 +93,6 @@ pub enum Cmd {
 	ExportHardcodedSync(ExportHsyncCmd),
 }
 
-pub struct Execute {
-	pub logger: LogConfig,
-	pub cmd: Cmd,
-}
-
 /// Configuration for the Parity client.
 #[derive(Debug, PartialEq)]
 pub struct Configuration {
@@ -114,7 +116,7 @@ impl Configuration {
 		Ok(config)
 	}
 
-	pub(crate) fn into_command(self) -> Result<Execute, String> {
+	pub(crate) fn into_command(self, logger: Option<Arc<RotatingLogger>>) -> Result<Cmd, String> {
 		let dirs = self.directories();
 		let pruning = self.args.arg_pruning.parse()?;
 		let pruning_history = self.args.arg_pruning_history;
@@ -143,7 +145,7 @@ impl Configuration {
 		let secretstore_conf = self.secretstore_config()?;
 		let format = self.format()?;
 
-		let cmd = if self.args.flag_version {
+		let cmd: Cmd = if self.args.flag_version {
 			Cmd::Version
 		} else if self.args.cmd_signer {
 			let authfile = ::signer::codes_path(&ws_conf.signer_path);
@@ -337,6 +339,12 @@ impl Configuration {
 			};
 			Cmd::ExportHardcodedSync(export_hs_cmd)
 		} else {
+			let logger = match logger {
+				Some(log) => log,
+				None => {
+					return Err("No logger provided".into());
+				}
+			};
 			let daemon = if self.args.cmd_daemon {
 				Some(self.args.arg_daemon_pid_file.clone().expect("CLI argument is required; qed"))
 			} else {
@@ -403,13 +411,13 @@ impl Configuration {
 				on_demand_request_backoff_rounds_max: self.args.arg_on_demand_request_backoff_rounds_max,
 				on_demand_request_consecutive_failures: self.args.arg_on_demand_request_consecutive_failures,
 			};
-			Cmd::Run(run_cmd)
+			Cmd::Run {
+				cmd: run_cmd,
+				logger: logger
+			}
 		};
 
-		Ok(Execute {
-			logger: logger_config,
-			cmd: cmd,
-		})
+		Ok(cmd)
 	}
 
 	fn vm_type(&self) -> Result<VMType, String> {
@@ -459,7 +467,7 @@ impl Configuration {
 		}
 	}
 
-	fn logger_config(&self) -> LogConfig {
+	pub fn logger_config(&self) -> LogConfig {
 		LogConfig {
 			mode: self.args.arg_logging.clone(),
 			color: !self.args.flag_no_color && !cfg!(windows),
@@ -1188,6 +1196,8 @@ mod tests {
 	use rpc::WsConfiguration;
 	use rpc_apis::ApiSet;
 	use run::RunCmd;
+	use ethcore_logger::RotatingLogger;
+	use std::sync::Arc;
 
 	use network::{AllowIP, IpFilter};
 
@@ -1205,18 +1215,22 @@ mod tests {
 		}
 	}
 
+	fn logger() -> Arc<RotatingLogger> {
+		Arc::new(RotatingLogger::new("test".to_owned()))
+	}
+
 	#[test]
 	fn test_command_version() {
 		let args = vec!["parity", "--version"];
 		let conf = parse(&args);
-		assert_eq!(conf.into_command().unwrap().cmd, Cmd::Version);
+		assert_eq!(conf.into_command(None).unwrap(), Cmd::Version);
 	}
 
 	#[test]
 	fn test_command_account_new() {
 		let args = vec!["parity", "account", "new"];
 		let conf = parse(&args);
-		assert_eq!(conf.into_command().unwrap().cmd, Cmd::Account(AccountCmd::New(NewAccount {
+		assert_eq!(conf.into_command(None).unwrap(), Cmd::Account(AccountCmd::New(NewAccount {
 			iterations: 10240,
 			path: Directories::default().keys,
 			password_file: None,
@@ -1228,7 +1242,7 @@ mod tests {
 	fn test_command_account_list() {
 		let args = vec!["parity", "account", "list"];
 		let conf = parse(&args);
-		assert_eq!(conf.into_command().unwrap().cmd, Cmd::Account(
+		assert_eq!(conf.into_command(None).unwrap(), Cmd::Account(
 			AccountCmd::List(ListAccounts {
 				path: Directories::default().keys,
 				spec: SpecType::default(),
@@ -1240,7 +1254,7 @@ mod tests {
 	fn test_command_account_import() {
 		let args = vec!["parity", "account", "import", "my_dir", "another_dir"];
 		let conf = parse(&args);
-		assert_eq!(conf.into_command().unwrap().cmd, Cmd::Account(AccountCmd::Import(ImportAccounts {
+		assert_eq!(conf.into_command(None).unwrap(), Cmd::Account(AccountCmd::Import(ImportAccounts {
 			from: vec!["my_dir".into(), "another_dir".into()],
 			to: Directories::default().keys,
 			spec: SpecType::default(),
@@ -1251,7 +1265,7 @@ mod tests {
 	fn test_command_wallet_import() {
 		let args = vec!["parity", "wallet", "import", "my_wallet.json", "--password", "pwd"];
 		let conf = parse(&args);
-		assert_eq!(conf.into_command().unwrap().cmd, Cmd::ImportPresaleWallet(ImportWallet {
+		assert_eq!(conf.into_command(None).unwrap(), Cmd::ImportPresaleWallet(ImportWallet {
 			iterations: 10240,
 			path: Directories::default().keys,
 			wallet_path: "my_wallet.json".into(),
@@ -1264,7 +1278,7 @@ mod tests {
 	fn test_command_blockchain_import() {
 		let args = vec!["parity", "import", "blockchain.json"];
 		let conf = parse(&args);
-		assert_eq!(conf.into_command().unwrap().cmd, Cmd::Blockchain(BlockchainCmd::Import(ImportBlockchain {
+		assert_eq!(conf.into_command(None).unwrap(), Cmd::Blockchain(BlockchainCmd::Import(ImportBlockchain {
 			spec: Default::default(),
 			cache_config: Default::default(),
 			dirs: Default::default(),
@@ -1289,7 +1303,7 @@ mod tests {
 	fn test_command_blockchain_export() {
 		let args = vec!["parity", "export", "blocks", "blockchain.json"];
 		let conf = parse(&args);
-		assert_eq!(conf.into_command().unwrap().cmd, Cmd::Blockchain(BlockchainCmd::Export(ExportBlockchain {
+		assert_eq!(conf.into_command(None).unwrap(), Cmd::Blockchain(BlockchainCmd::Export(ExportBlockchain {
 			spec: Default::default(),
 			cache_config: Default::default(),
 			dirs: Default::default(),
@@ -1312,7 +1326,7 @@ mod tests {
 	fn test_command_state_export() {
 		let args = vec!["parity", "export", "state", "state.json"];
 		let conf = parse(&args);
-		assert_eq!(conf.into_command().unwrap().cmd, Cmd::Blockchain(BlockchainCmd::ExportState(ExportState {
+		assert_eq!(conf.into_command(None).unwrap(), Cmd::Blockchain(BlockchainCmd::ExportState(ExportState {
 			spec: Default::default(),
 			cache_config: Default::default(),
 			dirs: Default::default(),
@@ -1337,7 +1351,7 @@ mod tests {
 	fn test_command_blockchain_export_with_custom_format() {
 		let args = vec!["parity", "export", "blocks", "--format", "hex", "blockchain.json"];
 		let conf = parse(&args);
-		assert_eq!(conf.into_command().unwrap().cmd, Cmd::Blockchain(BlockchainCmd::Export(ExportBlockchain {
+		assert_eq!(conf.into_command(None).unwrap(), Cmd::Blockchain(BlockchainCmd::Export(ExportBlockchain {
 			spec: Default::default(),
 			cache_config: Default::default(),
 			dirs: Default::default(),
@@ -1361,7 +1375,7 @@ mod tests {
 		let args = vec!["parity", "signer", "new-token"];
 		let conf = parse(&args);
 		let expected = Directories::default().signer;
-		assert_eq!(conf.into_command().unwrap().cmd, Cmd::SignerToken(WsConfiguration {
+		assert_eq!(conf.into_command(None).unwrap(), Cmd::SignerToken(WsConfiguration {
 			enabled: true,
 			interface: "127.0.0.1".into(),
 			port: 8546,
@@ -1460,7 +1474,7 @@ mod tests {
 		};
 		expected.secretstore_conf.enabled = cfg!(feature = "secretstore");
 		expected.secretstore_conf.http_enabled = cfg!(feature = "secretstore");
-		assert_eq!(conf.into_command().unwrap().cmd, Cmd::Run(expected));
+		assert_eq!(conf.into_command(Some(logger())).unwrap(), Cmd::Run {cmd: expected, logger: logger()});
 	}
 
 	#[test]
@@ -1680,8 +1694,9 @@ mod tests {
 	fn test_dev_preset() {
 		let args = vec!["parity", "--config", "dev"];
 		let conf = Configuration::parse_cli(&args).unwrap();
-		match conf.into_command().unwrap().cmd {
-			Cmd::Run(c) => {
+		let arc_logger= logger();
+		match conf.into_command(Some(arc_logger)).unwrap() {
+			Cmd::Run {cmd: c, logger: _logger} => {
 				assert_eq!(c.net_settings.chain, "dev");
 				assert_eq!(c.gas_pricer_conf, GasPricerConfig::Fixed(0.into()));
 				assert_eq!(c.miner_options.reseal_min_period, Duration::from_millis(0));
@@ -1694,8 +1709,9 @@ mod tests {
 	fn test_mining_preset() {
 		let args = vec!["parity", "--config", "mining"];
 		let conf = Configuration::parse_cli(&args).unwrap();
-		match conf.into_command().unwrap().cmd {
-			Cmd::Run(c) => {
+		let arc_logger= logger();
+		match conf.into_command(Some(arc_logger)).unwrap() {
+			Cmd::Run {cmd: c, logger: _logger} => {
 				assert_eq!(c.net_conf.min_peers, 50);
 				assert_eq!(c.net_conf.max_peers, 100);
 				assert_eq!(c.ipc_conf.enabled, false);
@@ -1715,8 +1731,9 @@ mod tests {
 	fn test_non_standard_ports_preset() {
 		let args = vec!["parity", "--config", "non-standard-ports"];
 		let conf = Configuration::parse_cli(&args).unwrap();
-		match conf.into_command().unwrap().cmd {
-			Cmd::Run(c) => {
+		let arc_logger= logger();
+		match conf.into_command(Some(arc_logger)).unwrap() {
+			Cmd::Run {cmd: c, logger: _logger} => {
 				assert_eq!(c.net_settings.network_port, 30305);
 				assert_eq!(c.net_settings.rpc_port, 8645);
 			},
@@ -1728,8 +1745,9 @@ mod tests {
 	fn test_insecure_preset() {
 		let args = vec!["parity", "--config", "insecure"];
 		let conf = Configuration::parse_cli(&args).unwrap();
-		match conf.into_command().unwrap().cmd {
-			Cmd::Run(c) => {
+		let arc_logger= logger();
+		match conf.into_command(Some(arc_logger)).unwrap() {
+			Cmd::Run {cmd: c, logger: _logger} => {
 				assert_eq!(c.update_policy.require_consensus, false);
 				assert_eq!(c.net_settings.rpc_interface, "0.0.0.0");
 				match c.http_conf.apis {
@@ -1748,8 +1766,9 @@ mod tests {
 	fn test_dev_insecure_preset() {
 		let args = vec!["parity", "--config", "dev-insecure"];
 		let conf = Configuration::parse_cli(&args).unwrap();
-		match conf.into_command().unwrap().cmd {
-			Cmd::Run(c) => {
+		let arc_logger= logger();
+		match conf.into_command(Some(arc_logger)).unwrap() {
+			Cmd::Run {cmd: c, logger: _logger} => {
 				assert_eq!(c.net_settings.chain, "dev");
 				assert_eq!(c.gas_pricer_conf, GasPricerConfig::Fixed(0.into()));
 				assert_eq!(c.miner_options.reseal_min_period, Duration::from_millis(0));
@@ -1771,8 +1790,9 @@ mod tests {
 	fn test_override_preset() {
 		let args = vec!["parity", "--config", "mining", "--min-peers=99"];
 		let conf = Configuration::parse_cli(&args).unwrap();
-		match conf.into_command().unwrap().cmd {
-			Cmd::Run(c) => {
+		let arc_logger= logger();
+		match conf.into_command(Some(arc_logger)).unwrap() {
+			Cmd::Run {cmd: c, logger: _logger} => {
 				assert_eq!(c.net_conf.min_peers, 99);
 			},
 			_ => panic!("Should be Cmd::Run"),
@@ -1783,8 +1803,9 @@ mod tests {
 	fn test_identity_arg() {
 		let args = vec!["parity", "--identity", "Somebody"];
 		let conf = Configuration::parse_cli(&args).unwrap();
-		match conf.into_command().unwrap().cmd {
-			Cmd::Run(c) => {
+		let arc_logger= logger();
+		match conf.into_command(Some(arc_logger)).unwrap() {
+			Cmd::Run {cmd: c, logger: _logger} => {
 				assert_eq!(c.name, "Somebody");
 				assert!(c.net_conf.client_version.starts_with("Parity-Ethereum/Somebody/"));
 			}
@@ -1904,8 +1925,9 @@ mod tests {
 	fn should_respect_only_max_peers_and_default() {
 		let args = vec!["parity", "--max-peers=50"];
 		let conf = Configuration::parse_cli(&args).unwrap();
-		match conf.into_command().unwrap().cmd {
-			Cmd::Run(c) => {
+		let arc_logger= logger();
+		match conf.into_command(Some(arc_logger)).unwrap() {
+			Cmd::Run {cmd: c, logger: _logger} => {
 				assert_eq!(c.net_conf.min_peers, 25);
 				assert_eq!(c.net_conf.max_peers, 50);
 			},
@@ -1917,8 +1939,9 @@ mod tests {
 	fn should_respect_only_max_peers_less_than_default() {
 		let args = vec!["parity", "--max-peers=5"];
 		let conf = Configuration::parse_cli(&args).unwrap();
-		match conf.into_command().unwrap().cmd {
-			Cmd::Run(c) => {
+		let arc_logger= logger();
+		match conf.into_command(Some(arc_logger)).unwrap() {
+			Cmd::Run {cmd: c, logger: _logger} => {
 				assert_eq!(c.net_conf.min_peers, 5);
 				assert_eq!(c.net_conf.max_peers, 5);
 			},
@@ -1930,8 +1953,9 @@ mod tests {
 	fn should_respect_only_min_peers_and_default() {
 		let args = vec!["parity", "--min-peers=5"];
 		let conf = Configuration::parse_cli(&args).unwrap();
-		match conf.into_command().unwrap().cmd {
-			Cmd::Run(c) => {
+		let arc_logger= logger();
+		match conf.into_command(Some(arc_logger)).unwrap() {
+			Cmd::Run {cmd: c, logger: _logger} => {
 				assert_eq!(c.net_conf.min_peers, 5);
 				assert_eq!(c.net_conf.max_peers, 50);
 			},
@@ -1943,8 +1967,9 @@ mod tests {
 	fn should_respect_only_min_peers_and_greater_than_default() {
 		let args = vec!["parity", "--min-peers=500"];
 		let conf = Configuration::parse_cli(&args).unwrap();
-		match conf.into_command().unwrap().cmd {
-			Cmd::Run(c) => {
+		let arc_logger= logger();
+		match conf.into_command(Some(arc_logger)).unwrap() {
+			Cmd::Run {cmd: c, logger: _logger} => {
 				assert_eq!(c.net_conf.min_peers, 500);
 				assert_eq!(c.net_conf.max_peers, 500);
 			},

@@ -113,9 +113,11 @@ use std::io::BufReader;
 use std::fs::File;
 use hash::keccak_buffer;
 use cli::Args;
-use configuration::{Cmd, Execute};
+use configuration::Cmd;
 use deprecated::find_deprecated;
-use ethcore_logger::setup_log;
+use ethcore_logger::RotatingLogger;
+use std::sync::Arc;
+
 #[cfg(feature = "memory_profiling")]
 use std::alloc::System;
 
@@ -178,21 +180,16 @@ pub enum ExecutionAction {
 	Running(RunningClient),
 }
 
-fn execute<Cr, Rr>(command: Execute, on_client_rq: Cr, on_updater_rq: Rr) -> Result<ExecutionAction, String>
+fn execute<Cr, Rr>(command: Cmd, on_client_rq: Cr, on_updater_rq: Rr) -> Result<ExecutionAction, String>
 	where Cr: Fn(String) + 'static + Send,
 		  Rr: Fn() + 'static + Send
 {
-	// TODO: move this to `main()` and expose in the C API so that users can setup logging the way
-	// 		they want
-	#[cfg(not(feature = "clib"))]
-	let logger = setup_log(&command.logger).expect("Logger is initialized only once; qed");
-
 	#[cfg(feature = "deadlock_detection")]
 	run_deadlock_detection_thread();
 
-	match command.cmd {
-		Cmd::Run(run_cmd) => {
-			let outcome = run::execute(run_cmd, logger, on_client_rq, on_updater_rq)?;
+	match command {
+		Cmd::Run { cmd, logger } => {
+			let outcome = run::execute(cmd, logger, on_client_rq, on_updater_rq)?;
 			Ok(ExecutionAction::Running(outcome))
 		},
 		Cmd::Version => Ok(ExecutionAction::Instant(Some(Args::print_version()))),
@@ -220,7 +217,7 @@ fn execute<Cr, Rr>(command: Execute, on_client_rq: Cr, on_updater_rq: Rr) -> Res
 /// binary.
 ///
 /// On error, returns what to print on stderr.
-pub fn start<Cr, Rr>(conf: Configuration, on_client_rq: Cr, on_updater_rq: Rr) -> Result<ExecutionAction, String>
+pub fn start<Cr, Rr>(conf: Configuration, logger: Arc<RotatingLogger>, on_client_rq: Cr, on_updater_rq: Rr) -> Result<ExecutionAction, String>
 	where Cr: Fn(String) + 'static + Send,
 			Rr: Fn() + 'static + Send
 {
@@ -229,5 +226,5 @@ pub fn start<Cr, Rr>(conf: Configuration, on_client_rq: Cr, on_updater_rq: Rr) -
 		println!("{}", d);
 	}
 
-	execute(conf.into_command()?, on_client_rq, on_updater_rq)
+	execute(conf.into_command(Some(logger))?, on_client_rq, on_updater_rq)
 }
